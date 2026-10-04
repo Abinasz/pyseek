@@ -4,8 +4,8 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from duckduckgo_search import DDGS
 
 load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -22,96 +22,42 @@ async def search(q: str, max_results: int = 40):
     if not q:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5"
-    }
-
     web_results = []
     seen_urls = set()
 
-    async with httpx.AsyncClient(headers=headers, timeout=12.0, follow_redirects=True) as client:
-        try:
-            ddg_url = "https://lite.duckduckgo.com/lite/"
-            res = await client.post(ddg_url, data={"q": q})
-            
-            if res.status_code == 200:
-                soup = BeautifulSoup(res.text, 'html.parser')
+    # Fetch live results using duckduckgo_search package (works on Render & local)
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(q, max_results=max_results))
+            for r in results:
+                raw_url = r.get("href", "")
+                title = r.get("title", "No Title")
+                snippet = r.get("body", "No description available.")
                 
-                # Primary parsing: DuckDuckGo Lite table rows
-                rows = soup.select('table tr')
-                current_title, current_url, current_snippet = "", "", ""
-                
-                for row in rows:
-                    link_elem = row.select_one('.result-link')
-                    if link_elem:
-                        current_title = link_elem.get_text(strip=True)
-                        raw_href = link_elem.get('href', '')
-                        if 'uddg=' in raw_href:
-                            parsed_qs = urllib.parse.parse_qs(urllib.parse.urlparse(raw_href).query)
-                            current_url = parsed_qs.get('uddg', [''])[0]
-                        else:
-                            current_url = raw_href
-                    
-                    snippet_elem = row.select_one('.result-snippet')
-                    if snippet_elem:
-                        current_snippet = snippet_elem.get_text(strip=True)
-                        if current_url and current_url.startswith('http') and current_url not in seen_urls:
-                            seen_urls.add(current_url)
-                            source = "Web"
-                            is_disc = False
-                            if "reddit.com" in current_url: 
-                                source = "Reddit"
-                                is_disc = True
-                            elif "twitter.com" in current_url or "x.com" in current_url: 
-                                source = "X"
-                                is_disc = True
-                            elif "quora.com" in current_url: 
-                                source = "Quora"
+                if raw_url and raw_url not in seen_urls:
+                    seen_urls.add(raw_url)
+                    source = "Web"
+                    is_disc = False
+                    if "reddit.com" in raw_url:
+                        source = "Reddit"
+                        is_disc = True
+                    elif "twitter.com" in raw_url or "x.com" in raw_url:
+                        source = "X"
+                        is_disc = True
+                    elif "quora.com" in raw_url:
+                        source = "Quora"
 
-                            web_results.append({
-                                "title": current_title or "No Title",
-                                "url": current_url,
-                                "snippet": current_snippet,
-                                "source": source,
-                                "is_discussion": is_disc
-                            })
-                            current_title, current_url, current_snippet = "", "", ""
+                    web_results.append({
+                        "title": title,
+                        "url": raw_url,
+                        "snippet": snippet,
+                        "source": source,
+                        "is_discussion": is_disc
+                    })
+    except Exception as e:
+        print(f"DDGS search error: {e}")
 
-                # Fallback parsing if table structure returned nothing
-                if not web_results:
-                    for a in soup.find_all('a', href=True):
-                        href = a.get('href', '')
-                        if 'uddg=' in href or href.startswith('http'):
-                            if 'uddg=' in href:
-                                parsed_qs = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
-                                target_url = parsed_qs.get('uddg', [''])[0]
-                            else:
-                                target_url = href
-                                
-                            title_text = a.get_text(strip=True)
-                            if target_url.startswith('http') and target_url not in seen_urls and len(title_text) > 5:
-                                seen_urls.add(target_url)
-                                source = "Web"
-                                is_disc = False
-                                if "reddit.com" in target_url: 
-                                    source = "Reddit"
-                                    is_disc = True
-                                elif "twitter.com" in target_url or "x.com" in target_url: 
-                                    source = "X"
-                                    is_disc = True
-
-                                web_results.append({
-                                    "title": title_text,
-                                    "url": target_url,
-                                    "snippet": f"Web reference result for {q} retrieved from live network search.",
-                                    "source": source,
-                                    "is_discussion": is_disc
-                                })
-        except Exception as e:
-            print(f"DDG Lite error: {e}")
-
+    # Ensure community links for Reddit/X are included neatly
     community_items = [
         {
             "title": f"Reddit Discussions & Community Hub: {q}",
@@ -136,6 +82,7 @@ async def search(q: str, max_results: int = 40):
             web_results.insert(insert_index, item)
             insert_index += 1
 
+    # Padding if results are sparse
     base_count = len(web_results)
     if base_count < max_results and base_count > 0:
         multiplier = 1
@@ -163,7 +110,7 @@ async def search(q: str, max_results: int = 40):
 @app.get("/api/ai-synthesis")
 async def ai_synthesis(q: str):
     if not OPENROUTER_API_KEY:
-        return {"ai_synthesis": "**AI Synthesis Notice:** `OPENROUTER_API_KEY` is missing in your .env file."}
+        return {"ai_synthesis": "**AI Synthesis Notice:** `OPENROUTER_API_KEY` is missing in your environment variables."}
     
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
