@@ -36,13 +36,13 @@ PySeek is a lightweight, local-first hybrid search engine and AI-powered synthes
 ```text
 pyseek/
 │
-├── static/             # Frontend files (HTML, CSS, JS UI)
-├── assets/             # Documentation images and media
-├── .env                # Environment variables (API keys)
-├── .gitignore          # Git exclusion rules
-├── main.py             # FastAPI backend server and endpoints
-├── requirements.txt    # Python package dependencies
-└── README.md           # Project documentation
+├── static/             
+├── assets/             
+├── .env                
+├── .gitignore          
+├── main.py             
+├── requirements.txt    
+└── README.md           
 ```
 
 Getting Started Locally
@@ -52,6 +52,7 @@ Follow these steps to set up and run PySeek on your local machine:
 Bash
 git clone [https://github.com/your-username/pyseek.git](https://github.com/abinasz/pyseek.git)
 cd pyseek
+------------------------------------------------------------------------------
 2. Create and Activate a Virtual Environment
 Bash
 python -m venv venv
@@ -59,26 +60,28 @@ python -m venv venv
 venv\Scripts\activate
 # On macOS/Linux:
 source venv/bin/activate
+------------------------------------------------------------------------------
 3. Install Dependencies
 Bash
 pip install -r requirements.txt
+------------------------------------------------------------------------------
+
 4. Configure Environment Variables
 Create a .env file in the root directory of your project and add your OpenRouter API key:
 
 Code snippet
-OPENROUTER_API_KEY=your_actual_openrouter_api_key_here
+OPENROUTER_API_KEY=<Yourapikey>
+------------------------------------------------------------------------------
+
 5. Run the Application
 Start the FastAPI server using Uvicorn:
-
-Bash
 uvicorn main:app --reload
+------------------------------------------------------------------------------
+
 6. Open in Your Browser
 Navigate to your local server address:
 http://127.0.0.1:8000 or http://localhost:8000
+------------------------------------------------------------------------------
 
-
-AI Synthesis API: GET /api/ai-synthesis?q=<query>
-
-Connects to OpenRouter to generate a structured, Markdown-formatted research briefing based on the search topic.
-
+#Enjoy your browser
 
