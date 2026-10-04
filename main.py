@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from dotenv import load_dotenv
 from duckduckgo_search import DDGS
+from bs4 import BeautifulSoup
 
 load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -25,7 +26,6 @@ async def search(q: str, max_results: int = 40):
     web_results = []
     seen_urls = set()
 
-    # Fetch live results using duckduckgo_search package (works on Render & local)
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(q, max_results=max_results))
@@ -57,7 +57,27 @@ async def search(q: str, max_results: int = 40):
     except Exception as e:
         print(f"DDGS search error: {e}")
 
-    # Ensure community links for Reddit/X are included neatly
+    if not web_results:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                alt_res = await client.get(f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(q)}", headers=headers)
+                if alt_res.status_code == 200:
+                    soup = BeautifulSoup(alt_res.text, 'html.parser')
+                    for a in soup.select('.result__url'):
+                        href = a.get('href', '')
+                        if href.startswith('http') and href not in seen_urls:
+                            seen_urls.add(href)
+                            web_results.append({
+                                "title": f"Result for {q}",
+                                "url": href,
+                                "snippet": f"Web reference index retrieved for {q}.",
+                                "source": "Web",
+                                "is_discussion": False
+                            })
+            except Exception as alt_e:
+                print(f"Fallback search error: {alt_e}")
+
     community_items = [
         {
             "title": f"Reddit Discussions & Community Hub: {q}",
@@ -82,7 +102,6 @@ async def search(q: str, max_results: int = 40):
             web_results.insert(insert_index, item)
             insert_index += 1
 
-    # Padding if results are sparse
     base_count = len(web_results)
     if base_count < max_results and base_count > 0:
         multiplier = 1
