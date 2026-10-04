@@ -6,7 +6,7 @@ PySeek is a lightweight, local-first hybrid search engine and AI-powered synthes
 
 ## Preview
 
-> Add a screenshot or GIF of your running application here to showcase your user interface.
+> Screenshot
 
 ![PySeek Interface Preview](assets/pyseek-screenshot.png)
 
