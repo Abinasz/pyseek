@@ -76,16 +76,6 @@ uvicorn main:app --reload
 Navigate to your local server address:
 http://127.0.0.1:8000 or http://localhost:8000
 
-API Endpoints
-PySeek exposes simple RESTful API routes to power its frontend and external integrations:
-
-Root Redirect: GET /
-
-Automatically redirects to the frontend web interface (/static/index.html).
-
-Search API: GET /api/search?q=<query>&max_results=<int>
-
-Queries live search sources, injects community discussion hubs, and returns a JSON payload containing web results and snippets.
 
 AI Synthesis API: GET /api/ai-synthesis?q=<query>
 
