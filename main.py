@@ -23,20 +23,23 @@ async def search(q: str, max_results: int = 40):
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5"
     }
 
     web_results = []
     seen_urls = set()
 
-    async with httpx.AsyncClient(headers=headers, timeout=10.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(headers=headers, timeout=12.0, follow_redirects=True) as client:
         try:
             ddg_url = "https://lite.duckduckgo.com/lite/"
             res = await client.post(ddg_url, data={"q": q})
             
             if res.status_code == 200:
                 soup = BeautifulSoup(res.text, 'html.parser')
+                
+                # Primary parsing: DuckDuckGo Lite table rows
                 rows = soup.select('table tr')
                 current_title, current_url, current_snippet = "", "", ""
                 
@@ -75,6 +78,37 @@ async def search(q: str, max_results: int = 40):
                                 "is_discussion": is_disc
                             })
                             current_title, current_url, current_snippet = "", "", ""
+
+                # Fallback parsing if table structure returned nothing
+                if not web_results:
+                    for a in soup.find_all('a', href=True):
+                        href = a.get('href', '')
+                        if 'uddg=' in href or href.startswith('http'):
+                            if 'uddg=' in href:
+                                parsed_qs = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
+                                target_url = parsed_qs.get('uddg', [''])[0]
+                            else:
+                                target_url = href
+                                
+                            title_text = a.get_text(strip=True)
+                            if target_url.startswith('http') and target_url not in seen_urls and len(title_text) > 5:
+                                seen_urls.add(target_url)
+                                source = "Web"
+                                is_disc = False
+                                if "reddit.com" in target_url: 
+                                    source = "Reddit"
+                                    is_disc = True
+                                elif "twitter.com" in target_url or "x.com" in target_url: 
+                                    source = "X"
+                                    is_disc = True
+
+                                web_results.append({
+                                    "title": title_text,
+                                    "url": target_url,
+                                    "snippet": f"Web reference result for {q} retrieved from live network search.",
+                                    "source": source,
+                                    "is_discussion": is_disc
+                                })
         except Exception as e:
             print(f"DDG Lite error: {e}")
 
