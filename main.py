@@ -3,6 +3,7 @@ import urllib.parse
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
@@ -11,6 +12,10 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/static/index.html")
 
 @app.get("/api/search")
 async def search(q: str, max_results: int = 40):
