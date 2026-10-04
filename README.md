@@ -56,9 +56,9 @@ cd pyseek
 2. Create and Activate a Virtual Environment
 Bash
 python -m venv venv
-# On Windows:
+On Windows:
 venv\Scripts\activate
-# On macOS/Linux:
+On macOS/Linux:
 source venv/bin/activate
 ------------------------------------------------------------------------------
 3. Install Dependencies
